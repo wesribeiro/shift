@@ -1,0 +1,21 @@
+{
+  "name": "shift-pwa",
+  "version": "1.0.0",
+  "description": "Calculadora de previsão de horário para colaboradores (Local First / Frontend Only)",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "npx live-server --port=8080 --entry-file=index.html"
+  },
+  "keywords": [
+    "pwa",
+    "shift",
+    "calculator",
+    "frontend-only",
+    "local-first"
+  ],
+  "author": "Pair Programming 2.0",
+  "license": "ISC",
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
