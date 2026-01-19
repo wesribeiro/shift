@@ -1,7 +1,7 @@
 /**
  * src/logic.js
  * Motor de cálculo de horários e regras de negócio do SHIFT.
- * Versão Atualizada: Inclui lógica de tempo restante de jornada.
+ * Versão: Faixa de Horários + Gatilhos de Notificação.
  */
 
 // ==========================================
@@ -47,104 +47,152 @@ export const calculateSchedule = (record, profile) => {
     const lunchInMin = timeToMinutes(times.lunch_in);
     
     // Configurações do Perfil
-    const workTarget = profile.work_target_min || 440; // 7h20
+    const workTarget = profile.work_target_min || 440; // 7h20 (440 min)
     const lunchTarget = profile.lunch_target || 100;   // 1h40
     const lunchMinLimit = profile.lunch_min_limit || 60;
+    const maxExtra = profile.max_extra || 120; // 2h extras permitidas
 
-    let estimatedExitMin = null;
+    let estimatedExitMin = null;     // Horário ideal (7h20 trab)
+    let limitExitMin = null;         // Horário limite (9h20 trab)
     let actualLunchDuration = 0;
     let timeWorkedSoFar = 0;
     
-    // 1. CÁLCULO DA SAÍDA ESTIMADA
+    // 1. CÁLCULO DA FAIXA DE SAÍDA
     if (entryMin !== null) {
+        let lunchCalc = lunchTarget; // Assume meta padrão
+
         if (lunchOutMin !== null && lunchInMin !== null) {
-            // Almoço já realizado: usa o tempo real
+            // Almoço realizado: usa real
             actualLunchDuration = lunchInMin - lunchOutMin;
-            estimatedExitMin = entryMin + workTarget + actualLunchDuration;
-        } else {
-            // Sem almoço ou almoço em andamento: projeta com a meta
-            estimatedExitMin = entryMin + workTarget + lunchTarget;
+            lunchCalc = actualLunchDuration;
+        } else if (lunchOutMin !== null) {
+            // Almoço em andamento: usa meta
+            lunchCalc = lunchTarget;
         }
+
+        // Saída Mínima (Jornada Padrão)
+        estimatedExitMin = entryMin + workTarget + lunchCalc;
+        
+        // Saída Máxima (Limite Legal)
+        limitExitMin = entryMin + workTarget + maxExtra + lunchCalc;
+    }
+
+    // String da Faixa: "16:20 - 18:20"
+    let exitRangeText = null;
+    if (estimatedExitMin !== null && limitExitMin !== null) {
+        exitRangeText = `${minutesToTime(estimatedExitMin)} - ${minutesToTime(limitExitMin)}`;
     }
 
     // 2. CÁLCULO DO TRABALHADO (LÍQUIDO)
     const nowMin = timeToMinutes(getCurrentTime());
     const exitSimulatedMin = timeToMinutes(times.exit_time_real);
     
-    // Define até quando calcular: Hora simulada OU Hora atual
     let calcEndMin = exitSimulatedMin !== null ? exitSimulatedMin : nowMin;
     let isSimulated = exitSimulatedMin !== null;
 
     if (entryMin !== null) {
         if (lunchOutMin === null) {
-            // Fase 1: Trabalho direto
             timeWorkedSoFar = Math.max(0, calcEndMin - entryMin);
         } else if (lunchInMin === null) {
-            // Fase 2: Está no almoço (pausa contagem)
             timeWorkedSoFar = Math.max(0, lunchOutMin - entryMin);
         } else {
-            // Fase 3: Voltou do almoço
             const firstShift = Math.max(0, lunchOutMin - entryMin);
             const secondShift = Math.max(0, calcEndMin - lunchInMin);
             timeWorkedSoFar = firstShift + secondShift;
         }
     }
 
-    // 3. CÁLCULO DO RESTANTE DE JORNADA (Novo recurso)
+    // 3. TEXTO DE STATUS (Restante / Extra / Excedido)
     let workRemainingText = null;
-    if (entryMin !== null) { // Só mostra se tiver começado a trabalhar
+    let workStatusType = 'normal'; // normal | extra | exceeded
+
+    if (entryMin !== null) {
         const remaining = workTarget - timeWorkedSoFar;
+        
         if (remaining > 0) {
+            // Ainda falta trabalhar
             workRemainingText = `(Restam ${minutesToTime(remaining)})`;
+            workStatusType = 'normal';
         } else {
-            workRemainingText = `(Extra ${minutesToTime(Math.abs(remaining))})`;
+            // Entrou em horas extras
+            const extraMinutes = Math.abs(remaining);
+            
+            if (extraMinutes <= maxExtra) {
+                // Hora Extra permitida
+                workRemainingText = `(Extra ${minutesToTime(extraMinutes)})`;
+                workStatusType = 'extra';
+            } else {
+                // Estourou o limite legal (> 2h)
+                const exceededBy = extraMinutes - maxExtra; // Opcional: mostrar quanto passou do limite ou total extra
+                // Vamos mostrar o total extra, mas mudar a label para Excedido
+                workRemainingText = `(Excedido ${minutesToTime(extraMinutes)})`;
+                workStatusType = 'exceeded';
+            }
         }
     }
 
-    // 4. STATUS DO ALMOÇO (TEXTO)
+    // 4. GATILHOS DE NOTIFICAÇÃO
+    // Calcula quantos minutos faltam para estourar o limite máximo (Target + MaxExtra)
+    let minutesToLimit = null;
+    let notificationTrigger = null;
+
+    if (entryMin !== null && !isSimulated) { // Só notifica se for tempo real
+        const totalLimit = workTarget + maxExtra;
+        minutesToLimit = totalLimit - timeWorkedSoFar;
+
+        // Gatilho 1: Exatamente 10 minutos para o fim (ou entrou na janela de 10 a 9 min)
+        if (minutesToLimit <= 10 && minutesToLimit > 1) {
+            notificationTrigger = 'warning_10min';
+        }
+        // Gatilho 2: 1 minuto para o fim (ou estourou agora)
+        else if (minutesToLimit <= 1) {
+            notificationTrigger = 'warning_critical';
+        }
+    }
+
+    // 5. STATUS DO ALMOÇO
     let lunchStatus = null;
-    let lunchTimeRemaining = null;
     let isLunchViolation = false;
 
     if (lunchOutMin !== null && lunchInMin === null) {
-        // Está no almoço agora
         const timeGone = nowMin - lunchOutMin;
-        lunchTimeRemaining = lunchTarget - timeGone;
+        const lunchRemaining = lunchTarget - timeGone;
         
-        if (lunchTimeRemaining < 0) {
-            lunchStatus = `Excedido: ${minutesToTime(Math.abs(lunchTimeRemaining))}`;
+        if (lunchRemaining < 0) {
+            lunchStatus = `Excedido: ${minutesToTime(Math.abs(lunchRemaining))}`;
             isLunchViolation = true;
         } else {
-            lunchStatus = `Restam: ${minutesToTime(lunchTimeRemaining)}`;
+            lunchStatus = `Restam: ${minutesToTime(lunchRemaining)}`;
         }
     }
 
-    // 5. ALERTAS
+    // 6. ALERTAS GERAIS
     const alerts = [];
-    
     if (actualLunchDuration > 0 && actualLunchDuration < lunchMinLimit) {
         alerts.push({ type: 'danger', message: `Almoço curto (${minutesToTime(actualLunchDuration)})` });
     }
-
-    // Alerta de Horas Extras Excessivas (> 2h / 120min)
-    // Verifica se já trabalhou ou se a projeção passará do limite
-    const maxExtra = profile.max_extra || 120;
-    // Se trabalhado atual já estourou
-    if (timeWorkedSoFar > (workTarget + maxExtra)) {
-        alerts.push({ type: 'danger', message: 'Limite de Horas Extras Excedido' });
+    if (workStatusType === 'exceeded') {
+        alerts.push({ type: 'danger', message: 'Limite legal de jornada excedido!' });
     }
 
     return {
-        estimatedExit: minutesToTime(estimatedExitMin),
-        workedCurrent: minutesToTime(timeWorkedSoFar),
-        workRemainingText: workRemainingText, // Novo Campo
-        lunchDuration: actualLunchDuration > 0 ? minutesToTime(actualLunchDuration) : null,
+        estimatedExit: minutesToTime(estimatedExitMin), // Mantemos para placeholder simples se precisar
+        exitRangeText: exitRangeText, // Nova faixa "16:20 - 18:20"
         
+        workedCurrent: minutesToTime(timeWorkedSoFar),
+        workRemainingText: workRemainingText,
+        workStatusType: workStatusType, // para cor
+        
+        lunchDuration: actualLunchDuration > 0 ? minutesToTime(actualLunchDuration) : null,
         lunchStatusText: lunchStatus,
         isLunchViolation: isLunchViolation,
         
         isSimulated: isSimulated,
-        alerts: alerts
+        alerts: alerts,
+        
+        // Dados para sistema de notificação
+        notificationTrigger: notificationTrigger,
+        minutesToLimit: minutesToLimit
     };
 };
 
