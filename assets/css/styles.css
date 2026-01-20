@@ -1,0 +1,164 @@
+/* SHIFT - Global Styles 
+   Versão Final: Dark Mode + Custom UI
+*/
+
+/* =========================================
+   SCROLLBARS PERSONALIZADAS
+   ========================================= */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+/* Light Mode Track */
+::-webkit-scrollbar-track {
+  background: #f8fafc; /* slate-50 */
+}
+/* Dark Mode Track */
+.dark ::-webkit-scrollbar-track {
+  background: #111827; /* gray-900 */
+}
+
+/* Light Mode Thumb */
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1; /* slate-300 */
+  border-radius: 4px;
+}
+/* Dark Mode Thumb */
+.dark ::-webkit-scrollbar-thumb {
+  background: #374151; /* gray-700 */
+}
+
+/* Hover States */
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; /* slate-400 */
+}
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #4b5563; /* gray-600 */
+}
+
+/* =========================================
+   ESTILOS DE PLACEHOLDER PARA ANÚNCIOS
+   ========================================= */
+#ad-header-slot,
+#ad-header-mobile,
+#ad-sidebar-left,
+#ad-sidebar-right {
+  transition: all 0.3s ease;
+  /* Light Mode Stripe */
+  background-image: repeating-linear-gradient(
+    45deg,
+    #f3f4f6, /* gray-100 */
+    #f3f4f6 10px,
+    #e5e7eb 10px, /* gray-200 */
+    #e5e7eb 20px
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Dark Mode Stripe */
+.dark #ad-header-slot,
+.dark #ad-header-mobile,
+.dark #ad-sidebar-left,
+.dark #ad-sidebar-right {
+  background-image: repeating-linear-gradient(
+    45deg,
+    #1f2937, /* gray-800 */
+    #1f2937 10px,
+    #374151 10px, /* gray-700 */
+    #374151 20px
+  );
+  border-color: #374151; /* gray-700 */
+}
+
+/* Remove background quando carregado */
+.ad-loaded {
+  background-image: none !important;
+  background-color: transparent !important;
+  border-style: none !important;
+}
+
+/* =========================================
+   INPUTS DE TABELA
+   ========================================= */
+td {
+  height: 52px; 
+}
+
+.table-input {
+  width: 100%;
+  background: transparent;
+  border: 1px solid transparent;
+  text-align: center;
+  border-radius: 6px;
+  padding: 4px 0;
+  font-family: inherit;
+  font-size: 0.875rem;
+  color: #111827; /* gray-900 */
+  transition: all 0.15s ease-in-out;
+}
+
+/* Dark Mode Text */
+.dark .table-input {
+  color: #e5e7eb; /* gray-200 */
+}
+
+/* Hover State */
+.table-input:hover {
+  background-color: #f9fafb; /* gray-50 */
+  border-color: #e2e8f0; /* gray-200 */
+}
+.dark .table-input:hover {
+  background-color: #374151; /* gray-700 */
+  border-color: #4b5563; /* gray-600 */
+}
+
+/* Focus State */
+.table-input:focus {
+  background-color: #ffffff;
+  border-color: #0ea5e9; /* brand-500 */
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.1);
+}
+.dark .table-input:focus {
+  background-color: #1f2937; /* gray-800 */
+  border-color: #0ea5e9;
+  box-shadow: 0 0 0 3px rgba(14, 165, 233, 0.2);
+}
+
+/* Placeholder */
+.table-input::placeholder {
+  color: #9ca3af; /* gray-400 */
+  font-weight: 400;
+}
+.dark .table-input::placeholder {
+  color: #6b7280; /* gray-500 */
+}
+
+/* =========================================
+   UTILITÁRIOS GERAIS
+   ========================================= */
+
+/* Ícone do Input Time (Reloginho) */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: invert(0.6); /* Cinza claro */
+  transition: filter 0.2s;
+}
+
+/* Dark Mode: Inverte para ficar branco/claro */
+.dark input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.8);
+}
+
+/* Focus State do Ícone */
+input[type="time"]:focus::-webkit-calendar-picker-indicator {
+  filter: invert(0.4) sepia(1) saturate(3) hue-rotate(190deg);
+}
+
+/* Font Mono para números */
+.font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
