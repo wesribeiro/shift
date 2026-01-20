@@ -1,7 +1,7 @@
 /**
  * src/ui.js
  * Controlador principal da Interface de Usuário.
- * Versão Final: Alinhamento Visual Corrigido (Estratégia de Espaçadores).
+ * Versão Corrigida: Adicionada função 'openCollaboratorsModal' que faltava.
  */
 
 import db from './db.js';
@@ -104,7 +104,7 @@ export async function init() {
 }
 
 // ==========================================
-// DARK MODE LOGIC
+// DARK MODE
 // ==========================================
 
 function toggleDarkMode() {
@@ -124,7 +124,7 @@ function applyTheme(isDark) {
 }
 
 // ==========================================
-// RELÓGIO & DATA
+// RELÓGIO
 // ==========================================
 
 function startClock() {
@@ -184,15 +184,8 @@ function createRow(record) {
     tr.recordData = record;
 
     const times = record.times || {};
-
-    // ESTRUTURA UNIFICADA PARA ALINHAMENTO PERFEITO
-    // Todas as colunas de horário agora têm:
-    // 1. Um container flex vertical centralizado (sem h-full para não esticar errado)
-    // 2. O elemento principal (Input ou Texto)
-    // 3. Um espaçador inferior com min-height fixa (14px) para garantir que todos tenham "2 andares"
-    
     const cellWrapperClass = "flex flex-col items-center justify-center py-1";
-    const spacerClass = "text-[10px] mt-0.5 min-h-[14px] leading-tight"; // Garante altura mesmo vazio
+    const spacerClass = "text-[10px] mt-0.5 min-h-[14px] leading-tight";
 
     tr.innerHTML = `
         <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
@@ -200,47 +193,43 @@ function createRow(record) {
                 <i class="ph ph-info text-xl"></i>
             </button>
         </td>
-
         <td class="px-3 align-middle text-sm font-medium text-gray-900 dark:text-white truncate max-w-[140px] border-b border-gray-100 dark:border-gray-700" title="${record.collaborator_name}">
             ${record.collaborator_name}
         </td>
-
         <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
             <div class="${cellWrapperClass}">
                 <span class="inline-block px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">${record.profile_name}</span>
                 <div class="${spacerClass}"></div> 
             </div>
         </td>
-
         <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
             <div class="${cellWrapperClass}">
                 <input type="time" class="table-input inp-entry dark:text-white" value="${times.entry || ''}">
-                <div class="${spacerClass}"></div> </div>
+                <div class="${spacerClass}"></div>
+            </div>
         </td>
-
         <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
             <div class="${cellWrapperClass}">
                 <input type="time" class="table-input inp-lunch-out dark:text-white" value="${times.lunch_out || ''}">
                 <div class="cell-lunch-status ${spacerClass}"></div>
             </div>
         </td>
-
         <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
             <div class="${cellWrapperClass}">
                 <input type="time" class="table-input inp-lunch-in dark:text-white" value="${times.lunch_in || ''}">
                 <div class="cell-lunch-duration ${spacerClass} text-gray-400 dark:text-gray-500"></div>
             </div>
         </td>
-
         <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
              <div class="${cellWrapperClass}">
-                 <div class="cell-exit-range text-xs font-medium text-gray-700 dark:text-gray-300 h-[29px] flex items-center">--:--</div> <div class="cell-exit-limit ${spacerClass} text-gray-400 dark:text-gray-500"></div>
+                 <div class="cell-exit-range text-xs font-medium text-gray-700 dark:text-gray-300 h-[29px] flex items-center">--:--</div>
+                 <div class="cell-exit-limit ${spacerClass} text-gray-400 dark:text-gray-500"></div>
              </div>
         </td>
-
         <td class="px-3 align-middle border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
             <div class="${cellWrapperClass}">
-                <div class="flex items-center h-[29px]"> <span class="cell-worked font-medium text-gray-600 dark:text-gray-400">--:--</span>
+                <div class="flex items-center h-[29px]">
+                    <span class="cell-worked font-medium text-gray-600 dark:text-gray-400">--:--</span>
                     <span class="cell-alerts inline-block ml-1"></span>
                 </div>
                 <div class="cell-worked-remaining ${spacerClass}"></div>
@@ -254,7 +243,6 @@ function createRow(record) {
 function updateRowVisuals(tr, schedule) {
     if (!schedule) return;
 
-    // 1. Lunch Status
     const elLunchStatus = tr.querySelector('.cell-lunch-status');
     if (schedule.lunchStatusText) {
         elLunchStatus.textContent = schedule.lunchStatusText;
@@ -263,11 +251,9 @@ function updateRowVisuals(tr, schedule) {
             : 'cell-lunch-status text-[10px] mt-0.5 min-h-[14px] leading-tight text-brand-600 dark:text-brand-400';
     } else { elLunchStatus.textContent = ''; }
 
-    // 2. Lunch Duration
     const elLunchDur = tr.querySelector('.cell-lunch-duration');
     elLunchDur.textContent = schedule.lunchDuration ? `(${schedule.lunchDuration})` : '';
 
-    // 3. Exit Range
     const elExitRange = tr.querySelector('.cell-exit-range');
     const elExitLimit = tr.querySelector('.cell-exit-limit');
     if (schedule.exitRangeText) {
@@ -278,7 +264,6 @@ function updateRowVisuals(tr, schedule) {
         elExitLimit.textContent = "";
     }
 
-    // 4. Worked
     const elWorked = tr.querySelector('.cell-worked');
     elWorked.textContent = schedule.workedCurrent;
     
@@ -287,7 +272,6 @@ function updateRowVisuals(tr, schedule) {
     else if (schedule.isSimulated) elWorked.className = 'cell-worked font-bold text-brand-600 dark:text-brand-400';
     else elWorked.className = 'cell-worked font-medium text-gray-600 dark:text-gray-400';
 
-    // 5. Remaining
     const elRemaining = tr.querySelector('.cell-worked-remaining');
     if (schedule.workRemainingText) {
         elRemaining.textContent = schedule.workRemainingText;
@@ -296,7 +280,6 @@ function updateRowVisuals(tr, schedule) {
         else elRemaining.className = 'cell-worked-remaining text-[10px] mt-0.5 min-h-[14px] leading-tight text-gray-400 dark:text-gray-500';
     } else { elRemaining.textContent = ''; }
 
-    // 6. Alerts
     const elAlerts = tr.querySelector('.cell-alerts');
     if (schedule.alerts && schedule.alerts.length > 0) {
         const hasDanger = schedule.alerts.some(a => a.type === 'danger');
@@ -307,7 +290,7 @@ function updateRowVisuals(tr, schedule) {
 }
 
 // ==========================================
-// NOTIFICATIONS & TOASTS
+// NOTIFICATIONS
 // ==========================================
 
 function checkNotifications(record, schedule) {
@@ -337,6 +320,7 @@ function createToast(title, body, type) {
     if (!container) return;
 
     const toast = document.createElement('div');
+    
     let bgClass = 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700';
     let iconClass = 'text-brand-500 dark:text-brand-400';
     let iconName = 'info';
@@ -377,7 +361,7 @@ function createToast(title, body, type) {
 }
 
 // ==========================================
-// SEARCH & MODAIS
+// FUNÇÕES DE BUSCA E MODAIS
 // ==========================================
 
 function showSearchResults(results, query) {
@@ -448,6 +432,14 @@ async function loadCollaboratorsList(query) {
     });
 }
 
+// *** ESTA É A FUNÇÃO QUE FALTAVA NA VERSÃO ANTERIOR ***
+async function openCollaboratorsModal() {
+    elements.inputSearchCollabModal.value = '';
+    elements.modalCollaborators.classList.remove('hidden');
+    elements.modalBackdrop.classList.remove('hidden');
+    loadCollaboratorsList('');
+}
+
 async function openInfoModal(record) {
     elements.infoName.textContent = record.collaborator_name;
     const history = await db.getHistory(record.collaborator_id, 5);
@@ -496,46 +488,271 @@ async function openInfoModal(record) {
     elements.modalBackdrop.classList.remove('hidden');
 }
 
+function openRegisterModal(nameValue = '') {
+    elements.inputRegName.value = nameValue;
+    elements.inputRegEntry.value = '';
+    elements.selectRegProfile.value = '1'; 
+    elements.modalRegister.classList.remove('hidden');
+    elements.modalBackdrop.classList.remove('hidden');
+    setTimeout(() => elements.inputRegName.focus(), 100);
+}
+
+function closeRegisterModal() {
+    elements.modalRegister.classList.add('hidden');
+    if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
+}
+
+async function handleSaveRegister() {
+    const name = elements.inputRegName.value.trim();
+    const profileId = elements.selectRegProfile.value;
+    const entryTime = elements.inputRegEntry.value;
+
+    if (!name) {
+        showConfirmModal("Erro", "Nome é obrigatório", null, true);
+        return;
+    }
+
+    try {
+        const newId = await db.addCollaborator(name, profileId);
+        const newRecord = {
+            collaborator_id: newId,
+            date: state.currentDate,
+            times: {},
+            status: 'working'
+        };
+
+        if (entryTime) {
+            newRecord.times.entry = entryTime;
+        }
+
+        await db.saveDailyRecord(newRecord);
+        closeRegisterModal();
+        elements.inputSearch.value = ''; 
+        loadDailyRecords();
+
+    } catch (e) {
+        console.error(e);
+        showConfirmModal("Erro", "Falha ao salvar registro.", null, true);
+    }
+}
+
 // ==========================================
-// HELPERS & EVENTS
+// HELPERS
 // ==========================================
 
 function setupEventListeners() {
+    // Theme
     elements.btnThemeToggle.addEventListener('click', toggleDarkMode);
 
+    // Search
     elements.inputSearch.addEventListener('input', (e) => {
         const query = e.target.value;
         if (state.searchDebounce) clearTimeout(state.searchDebounce);
         state.searchDebounce = setTimeout(async () => {
-            if (query.length < 2) { closeSearchResults(); return; }
+            if (query.length < 2) {
+                closeSearchResults();
+                return;
+            }
             const results = await db.searchCollaborators(query);
             showSearchResults(results, query);
         }, 300);
     });
 
+    // Buttons
     elements.btnOpenRegister.addEventListener('click', () => openRegisterModal(elements.inputSearch.value));
     elements.btnOpenCollaborators.addEventListener('click', openCollaboratorsModal);
-    elements.btnOpenManual.addEventListener('click', () => { elements.modalManual.classList.remove('hidden'); elements.modalBackdrop.classList.remove('hidden'); });
+    elements.btnOpenManual.addEventListener('click', () => {
+        elements.modalManual.classList.remove('hidden');
+        elements.modalBackdrop.classList.remove('hidden');
+    });
 
+    // Modal Register Actions
     elements.btnSaveRegister.addEventListener('click', handleSaveRegister);
     elements.btnCancelRegister.addEventListener('click', closeRegisterModal);
     
+    // Modal Info Actions
     elements.btnCloseInfo.addEventListener('click', closeInfoModal);
     elements.btnCloseInfoX.addEventListener('click', closeInfoModal);
     
-    elements.btnCloseCollab.addEventListener('click', () => { elements.modalCollaborators.classList.add('hidden'); if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden'); });
-    elements.inputSearchCollabModal.addEventListener('input', (e) => { const query = e.target.value; if (state.collabSearchDebounce) clearTimeout(state.collabSearchDebounce); state.collabSearchDebounce = setTimeout(() => loadCollaboratorsList(query), 300); });
-    elements.btnCloseManual.addEventListener('click', () => { elements.modalManual.classList.add('hidden'); if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden'); });
+    // Modal Collab Actions
+    elements.btnCloseCollab.addEventListener('click', () => {
+        elements.modalCollaborators.classList.add('hidden');
+        if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
+    });
+    
+    elements.inputSearchCollabModal.addEventListener('input', (e) => {
+        const query = e.target.value;
+        if (state.collabSearchDebounce) clearTimeout(state.collabSearchDebounce);
+        state.collabSearchDebounce = setTimeout(() => loadCollaboratorsList(query), 300);
+    });
+
+    // Modal Manual Actions
+    elements.btnCloseManual.addEventListener('click', () => {
+        elements.modalManual.classList.add('hidden');
+        if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
+    });
 }
 
-function hasOtherModalsOpen() { return !elements.modalRegister.classList.contains('hidden') || !elements.modalInfo.classList.contains('hidden') || !elements.modalConfirm.classList.contains('hidden'); }
-function closeSearchResults() { const el = document.getElementById('search-results'); if (el) el.remove(); }
-async function addToDaily(collab) { closeSearchResults(); elements.inputSearch.value = ''; const exists = state.records.find(r => r.collaborator_id === collab.id); if (exists) { showConfirmModal("Aviso", "Este colaborador já está na lista de hoje.", null, true); return; } const newRecord = { collaborator_id: collab.id, date: state.currentDate, times: {}, status: 'working' }; await db.saveDailyRecord(newRecord); loadDailyRecords(); }
-function openRegisterModal(nameValue = '') { elements.inputRegName.value = nameValue; elements.inputRegEntry.value = ''; elements.selectRegProfile.value = '1'; elements.modalRegister.classList.remove('hidden'); elements.modalBackdrop.classList.remove('hidden'); setTimeout(() => elements.inputRegName.focus(), 100); }
-function closeRegisterModal() { elements.modalRegister.classList.add('hidden'); if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden'); }
-async function handleSaveRegister() { const name = elements.inputRegName.value.trim(); const profileId = elements.selectRegProfile.value; const entryTime = elements.inputRegEntry.value; if (!name) { showConfirmModal("Erro", "Nome é obrigatório", null, true); return; } try { const newId = await db.addCollaborator(name, profileId); const newRecord = { collaborator_id: newId, date: state.currentDate, times: {}, status: 'working' }; if (entryTime) newRecord.times.entry = entryTime; await db.saveDailyRecord(newRecord); closeRegisterModal(); elements.inputSearch.value = ''; loadDailyRecords(); } catch (e) { console.error(e); showConfirmModal("Erro", "Falha ao salvar registro.", null, true); } }
-function closeInfoModal() { elements.modalInfo.classList.add('hidden'); if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden'); }
-function renderAlertsList(alerts) { if (!alerts || alerts.length === 0) return ''; let html = '<div class="mt-3 space-y-1">'; alerts.forEach(a => { const colorClass = a.type === 'danger' ? 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-800' : 'text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900/40 border border-yellow-200 dark:border-yellow-800'; html += `<div class="${colorClass} px-2 py-1.5 rounded text-xs flex items-center gap-2"><i class="ph ph-warning-circle"></i> ${a.message}</div>`; }); html += '</div>'; return html; }
-function showConfirmModal(title, message, onConfirm, isAlertOnly = false, onCancel = null) { elements.confirmMessage.textContent = message; elements.modalConfirm.classList.remove('hidden'); elements.modalBackdrop.classList.remove('hidden'); const btnYes = elements.btnConfirmYes; const btnNo = elements.btnConfirmNo; const newYes = btnYes.cloneNode(true); const newNo = btnNo.cloneNode(true); btnYes.parentNode.replaceChild(newYes, btnYes); btnNo.parentNode.replaceChild(newNo, btnNo); elements.btnConfirmYes = newYes; elements.btnConfirmNo = newNo; if (isAlertOnly) { newYes.textContent = "OK"; newNo.classList.add('hidden'); newYes.onclick = () => { elements.modalConfirm.classList.add('hidden'); if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden'); if (onConfirm) onConfirm(); }; } else { newYes.textContent = "Confirmar"; newNo.classList.remove('hidden'); newYes.onclick = () => { elements.modalConfirm.classList.add('hidden'); if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden'); if (onConfirm) onConfirm(); }; newNo.onclick = () => { elements.modalConfirm.classList.add('hidden'); if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden'); if (onCancel) onCancel(); }; } }
-function attachRowEvents(tr) { const record = tr.recordData; const inputs = { entry: tr.querySelector('.inp-entry'), lunch_out: tr.querySelector('.inp-lunch-out'), lunch_in: tr.querySelector('.inp-lunch-in') }; const handleInput = (field, value) => { if (!record.times) record.times = {}; if (value) record.times[field] = value; else delete record.times[field]; const schedule = Logic.calculateSchedule(record, record.profile_data); updateRowVisuals(tr, schedule); checkNotifications(record, schedule); }; const handleSave = async () => { await db.saveDailyRecord(record); }; Object.keys(inputs).forEach(key => { const input = inputs[key]; if(!input) return; input.addEventListener('input', (e) => handleInput(key, e.target.value)); input.addEventListener('change', async (e) => { const value = e.target.value; if (key === 'lunch_in' && value) { const validation = Logic.validateLunchReturn(record.times.lunch_out, value, record.profile_data); if (!validation.valid) { showConfirmModal("Erro", validation.message, null, true); e.target.value = ''; handleInput(key, ''); return; } if (validation.warning) { showConfirmModal("Atenção", validation.message, async () => { await handleSave(); }, false, () => { e.target.value = ''; handleInput(key, ''); }); return; } } await handleSave(); }); }); tr.querySelector('.btn-info').addEventListener('click', () => openInfoModal(record)); }
-function startTimeLoop() { setInterval(() => { const rows = document.querySelectorAll('#table-body tr'); rows.forEach(tr => { const record = tr.recordData; if (record) { const schedule = Logic.calculateSchedule(record, record.profile_data); updateRowVisuals(tr, schedule); checkNotifications(record, schedule); } }); }, 60000); }
+function hasOtherModalsOpen() {
+    return !elements.modalRegister.classList.contains('hidden') || 
+           !elements.modalInfo.classList.contains('hidden') ||
+           !elements.modalConfirm.classList.contains('hidden');
+}
+
+function closeSearchResults() {
+    const el = document.getElementById('search-results');
+    if (el) el.remove();
+}
+
+async function addToDaily(collab) {
+    closeSearchResults();
+    elements.inputSearch.value = '';
+    const exists = state.records.find(r => r.collaborator_id === collab.id);
+    if (exists) {
+        showConfirmModal("Aviso", "Este colaborador já está na lista de hoje.", null, true);
+        return;
+    }
+    const newRecord = {
+        collaborator_id: collab.id,
+        date: state.currentDate,
+        times: {},
+        status: 'working'
+    };
+    await db.saveDailyRecord(newRecord);
+    loadDailyRecords();
+}
+
+function closeInfoModal() {
+    elements.modalInfo.classList.add('hidden');
+    if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
+}
+
+function renderAlertsList(alerts) {
+    if (!alerts || alerts.length === 0) return '';
+    let html = '<div class="mt-3 space-y-1">';
+    alerts.forEach(a => {
+        const colorClass = a.type === 'danger' ? 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/40 border border-red-200 dark:border-red-800' : 'text-yellow-700 dark:text-yellow-300 bg-yellow-100 dark:bg-yellow-900/40 border border-yellow-200 dark:border-yellow-800';
+        html += `<div class="${colorClass} px-2 py-1.5 rounded text-xs flex items-center gap-2"><i class="ph ph-warning-circle"></i> ${a.message}</div>`;
+    });
+    html += '</div>';
+    return html;
+}
+
+function showConfirmModal(title, message, onConfirm, isAlertOnly = false, onCancel = null) {
+    elements.confirmMessage.textContent = message;
+    elements.modalConfirm.classList.remove('hidden');
+    elements.modalBackdrop.classList.remove('hidden');
+
+    const btnYes = elements.btnConfirmYes;
+    const btnNo = elements.btnConfirmNo;
+    
+    const newYes = btnYes.cloneNode(true);
+    const newNo = btnNo.cloneNode(true);
+    btnYes.parentNode.replaceChild(newYes, btnYes);
+    btnNo.parentNode.replaceChild(newNo, btnNo);
+
+    elements.btnConfirmYes = newYes;
+    elements.btnConfirmNo = newNo;
+
+    if (isAlertOnly) {
+        newYes.textContent = "OK";
+        newNo.classList.add('hidden');
+        newYes.onclick = () => {
+            elements.modalConfirm.classList.add('hidden');
+            if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
+            if (onConfirm) onConfirm();
+        };
+    } else {
+        newYes.textContent = "Confirmar";
+        newNo.classList.remove('hidden');
+        newYes.onclick = () => {
+            elements.modalConfirm.classList.add('hidden');
+            if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
+            if (onConfirm) onConfirm();
+        };
+        newNo.onclick = () => {
+            elements.modalConfirm.classList.add('hidden');
+            if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
+            if (onCancel) onCancel();
+        };
+    }
+}
+
+function attachRowEvents(tr) {
+    const record = tr.recordData; 
+    const inputs = {
+        entry: tr.querySelector('.inp-entry'),
+        lunch_out: tr.querySelector('.inp-lunch-out'),
+        lunch_in: tr.querySelector('.inp-lunch-in')
+    };
+
+    const handleInput = (field, value) => {
+        if (!record.times) record.times = {};
+        if (value) {
+            record.times[field] = value;
+        } else {
+            delete record.times[field];
+        }
+        const schedule = Logic.calculateSchedule(record, record.profile_data);
+        updateRowVisuals(tr, schedule);
+        checkNotifications(record, schedule);
+    };
+
+    const handleSave = async () => {
+        await db.saveDailyRecord(record);
+    };
+
+    Object.keys(inputs).forEach(key => {
+        const input = inputs[key];
+        if (!input) return;
+
+        input.addEventListener('input', (e) => {
+            handleInput(key, e.target.value);
+        });
+
+        input.addEventListener('change', async (e) => {
+            const value = e.target.value;
+            if (key === 'lunch_in' && value) {
+                const validation = Logic.validateLunchReturn(
+                    record.times.lunch_out, 
+                    value, 
+                    record.profile_data
+                );
+
+                if (!validation.valid) {
+                    showConfirmModal("Erro", validation.message, null, true);
+                    e.target.value = ''; 
+                    handleInput(key, '');
+                    return;
+                }
+                
+                if (validation.warning) {
+                    showConfirmModal("Atenção", validation.message, async () => {
+                        await handleSave();
+                    }, false, () => {
+                        e.target.value = '';
+                        handleInput(key, '');
+                    });
+                    return; 
+                }
+            }
+            await handleSave();
+        });
+    });
+
+    tr.querySelector('.btn-info').addEventListener('click', () => openInfoModal(record));
+}
+
+function startTimeLoop() {
+    setInterval(() => {
+        const rows = document.querySelectorAll('#table-body tr');
+        rows.forEach(tr => {
+            const record = tr.recordData;
+            if (record) {
+                const schedule = Logic.calculateSchedule(record, record.profile_data);
+                updateRowVisuals(tr, schedule);
+                checkNotifications(record, schedule);
+            }
+        });
+    }, 60000);
+}
