@@ -1,138 +1,160 @@
 /**
  * src/ads.js
- * Gerenciador de Anúncios (Monetização CPM).
- * Versão Final: Configurada para Layout Full Width (Header + 2 Laterais).
+ * Gerenciador de Anúncios (Monetização).
+ * Versão Final: Layout Simétrico (300x600 em ambas as laterais).
  */
 
-// Configurações
+// =========================================================
+// CONFIGURAÇÃO DO ADSENSE
+// =========================================================
 const ADS_CONFIG = {
-    refreshInterval: 60000, // 60 segundos
+    // Mude para 'true' quando o site for aprovado e estiver em produção
+    isProduction: false, 
+
+    // Seu ID de Editor (encontrado na conta AdSense: pub-xxxxxxxxxxxxxxxx)
+    client: 'ca-pub-0000000000000000', 
+
     slots: [
-        // Topo (Leaderboard 728x90)
-        { id: 'ad-header-slot', type: 'leaderboard' },
-        
-        // Lateral Esquerda (Skyscraper 160x600) - Apenas Desktop Large
-        { id: 'ad-sidebar-left', type: 'skyscraper' },
-        
-        // Lateral Direita (Medium Rectangle/Skyscraper 300x600) - Desktop
-        { id: 'ad-sidebar-right', type: 'rect' }
+        { 
+            id: 'ad-header-slot', 
+            type: 'leaderboard',
+            // ID do Bloco criado no AdSense para o Topo
+            adSlot: '1234567890', 
+            // Estilo forçado para evitarCLS (Cumulative Layout Shift)
+            style: 'display:inline-block;width:728px;height:90px', 
+            format: 'auto'
+        },
+        { 
+            id: 'ad-sidebar-left', 
+            type: 'halfpage',
+            // ID do Bloco para Esquerda (Agora 300x600)
+            adSlot: '2345678901', 
+            style: 'display:inline-block;width:300px;height:600px'
+        },
+        { 
+            id: 'ad-sidebar-right', 
+            type: 'halfpage',
+            // ID do Bloco para Direita (300x600)
+            adSlot: '3456789012', 
+            style: 'display:inline-block;width:300px;height:600px'
+        }
     ],
-    isProduction: false // Mude para true em produção
+    
+    // Intervalo de Refresh (apenas para placeholders de dev)
+    refreshInterval: 60000 
 };
 
 let refreshTimer = null;
 let secondsSinceLastRefresh = 0;
 
 export function initAds() {
-    console.log("Inicializando módulo de anúncios (Layout 3 Colunas)...");
+    console.log(`Inicializando Ads (Modo: ${ADS_CONFIG.isProduction ? 'PRODUÇÃO' : 'DESENVOLVIMENTO'})...`);
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    startRefreshLoop();
+    // Carrega os anúncios iniciais
     loadAdsInitial();
+
+    // Se estiver em DEV, inicia o timer visual. 
+    // Em PROD, o Google cuida do refresh automaticamente.
+    if (!ADS_CONFIG.isProduction) {
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        startRefreshLoop();
+    }
 }
 
-/**
- * Carrega os anúncios pela primeira vez.
- */
 function loadAdsInitial() {
     ADS_CONFIG.slots.forEach(slot => {
-        const el = document.getElementById(slot.id);
+        const container = document.getElementById(slot.id);
         
-        // Se o elemento não existe no DOM (ex: mobile ocultando laterais), ignora
-        if (!el) return;
+        // Se o slot não existe na tela (ex: mobile esconde laterais), ignora
+        if (!container) return;
+
+        // Limpa o placeholder listrado e marca como carregado
+        container.innerHTML = '';
+        container.classList.add('ad-loaded');
 
         if (ADS_CONFIG.isProduction) {
-            // (window.adsbygoogle = window.adsbygoogle || []).push({});
-            el.classList.add('ad-loaded');
+            // ==========================================
+            // INJEÇÃO REAL DO ADSENSE
+            // ==========================================
+            try {
+                const ins = document.createElement('ins');
+                ins.className = 'adsbygoogle';
+                ins.style.cssText = slot.style || 'display:block';
+                ins.setAttribute('data-ad-client', ADS_CONFIG.client);
+                ins.setAttribute('data-ad-slot', slot.adSlot);
+                
+                if (slot.format) {
+                    ins.setAttribute('data-ad-format', slot.format);
+                    ins.setAttribute('data-full-width-responsive', 'true');
+                }
+
+                container.appendChild(ins);
+
+                // Solicita o anúncio (Push)
+                (window.adsbygoogle = window.adsbygoogle || []).push({});
+                // console.log(`AdSense push enviado para: ${slot.id}`);
+
+            } catch (e) {
+                console.error("Erro ao carregar AdSense:", e);
+            }
+
         } else {
-            // Placeholder Dev Mode
-            // Pequeno delay para simular carregamento assíncrono
-            setTimeout(() => {
-                const dims = getDimensionsByType(slot.type);
-                el.innerHTML = `
-                    <div class="flex flex-col items-center justify-center h-full w-full bg-gray-100 text-gray-400 text-[10px] p-2 text-center select-none cursor-default">
-                        <span class="font-bold mb-1 text-gray-500">AD SPACE</span>
-                        <span class="text-[9px] uppercase tracking-wider mb-1">${slot.type}</span>
-                        <span class="font-mono text-gray-600 bg-gray-200 px-2 py-0.5 rounded">
-                            Refresh: <span id="timer-${slot.id}">0</span>s
-                        </span>
-                    </div>
-                `;
-                el.classList.add('ad-loaded');
-            }, 300); 
+            // ==========================================
+            // PLACEHOLDER DE DESENVOLVIMENTO
+            // ==========================================
+            container.classList.remove('ad-loaded'); // Mantém estilo visual se necessário
+            
+            // Dimensões para texto de debug
+            const dimText = getDimensionsByType(slot.type);
+
+            container.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full w-full bg-gray-200 dark:bg-gray-800 border border-dashed border-gray-400 dark:border-gray-600 rounded text-center select-none cursor-not-allowed transition-colors">
+                    <span class="font-bold mb-1 text-gray-500 dark:text-gray-400 text-[10px]">PUBLICIDADE</span>
+                    <span class="text-[9px] uppercase tracking-wider mb-1 text-gray-400">${dimText}</span>
+                    <span class="font-mono text-gray-600 dark:text-gray-300 bg-gray-300 dark:bg-gray-700 px-2 py-0.5 rounded text-[10px]">
+                        Refresh: <span id="timer-${slot.id}">0</span>s
+                    </span>
+                </div>
+            `;
         }
     });
 }
 
-/**
- * Loop principal de refresh.
- */
+// ==========================================
+// LÓGICA APENAS PARA DESENVOLVIMENTO (DEV)
+// ==========================================
+
 function startRefreshLoop() {
     refreshTimer = setInterval(() => {
         if (document.hidden) return;
 
         secondsSinceLastRefresh++;
-
-        if (!ADS_CONFIG.isProduction) updateDevTimers(secondsSinceLastRefresh);
+        updateDevTimers(secondsSinceLastRefresh);
 
         if (secondsSinceLastRefresh * 1000 >= ADS_CONFIG.refreshInterval) {
-            refreshSlots();
+            simulateRefreshEffect();
             secondsSinceLastRefresh = 0;
         }
     }, 1000);
 }
 
-/**
- * Refresh apenas nos slots visíveis.
- */
-function refreshSlots() {
-    // console.log("ADS: Refresh cycle triggered.");
-    
+function simulateRefreshEffect() {
     ADS_CONFIG.slots.forEach(slot => {
-        const el = document.getElementById(slot.id);
-        
-        if (isElementInViewport(el)) {
-            if (ADS_CONFIG.isProduction) {
-                // Refresh logic real (GPT/AdSense)
-            } else {
-                // Feedback visual de refresh
-                const timerDisplay = document.getElementById(`timer-${slot.id}`);
-                if (timerDisplay) {
-                    const parent = timerDisplay.parentElement;
-                    const originalBg = parent.className;
-                    
-                    // Pisca verde
-                    parent.className = "font-mono text-white bg-green-500 px-2 py-0.5 rounded transition-colors duration-300";
-                    timerDisplay.textContent = "OK";
-                    
-                    setTimeout(() => { 
-                        if(parent) {
-                            parent.className = "font-mono text-gray-600 bg-gray-200 px-2 py-0.5 rounded transition-colors duration-500";
-                            timerDisplay.textContent = "0";
-                        }
-                    }, 1000);
+        const timerDisplay = document.getElementById(`timer-${slot.id}`);
+        if (timerDisplay) {
+            const parent = timerDisplay.parentElement;
+            // Efeito visual de "flash" verde
+            parent.className = "font-mono text-white bg-brand-500 px-2 py-0.5 rounded transition-colors duration-300 text-[10px]";
+            timerDisplay.textContent = "OK";
+            
+            setTimeout(() => { 
+                if(parent) {
+                    parent.className = "font-mono text-gray-600 dark:text-gray-300 bg-gray-300 dark:bg-gray-700 px-2 py-0.5 rounded transition-colors duration-500 text-[10px]";
+                    timerDisplay.textContent = "0";
                 }
-            }
+            }, 1000);
         }
     });
-}
-
-function handleVisibilityChange() {
-    // Lógica opcional para forçar refresh ao voltar para aba após muito tempo
-}
-
-// Helpers
-function isElementInViewport(el) {
-    if (!el) return false;
-    if (el.offsetParent === null) return false; // Elemento oculto (display:none)
-
-    const rect = el.getBoundingClientRect();
-    return (
-        rect.top >= 0 &&
-        rect.left >= 0 &&
-        rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-        rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-    );
 }
 
 function updateDevTimers(seconds) {
@@ -142,11 +164,14 @@ function updateDevTimers(seconds) {
     });
 }
 
+function handleVisibilityChange() {
+    // Pode ser usado para pausar timers se a aba não estiver visível
+}
+
 function getDimensionsByType(type) {
     switch(type) {
         case 'leaderboard': return '728x90';
-        case 'skyscraper': return '160x600';
-        case 'rect': return '300x600';
+        case 'halfpage': return '300x600'; // Ajustado para refletir a nova simetria
         default: return 'Ad';
     }
 }

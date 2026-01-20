@@ -1,7 +1,7 @@
 /**
  * src/ui.js
  * Controlador principal da Interface de Usuário.
- * Versão Corrigida: Adicionada função 'openCollaboratorsModal' que faltava.
+ * Versão Final: Regra de 6h (Almoço), Design Simétrico e Funcionalidades Completas.
  */
 
 import db from './db.js';
@@ -11,6 +11,7 @@ import * as Logic from './logic.js';
 // UTILITÁRIOS
 // ==========================================
 
+// Garante data local (evita bug de fuso horário UTC)
 const getLocalISODate = () => {
     const now = new Date();
     const year = now.getFullYear();
@@ -20,7 +21,7 @@ const getLocalISODate = () => {
 };
 
 // ==========================================
-// ESTADO
+// ESTADO DA APLICAÇÃO
 // ==========================================
 
 const state = {
@@ -29,26 +30,35 @@ const state = {
     searchDebounce: null,
     collabSearchDebounce: null,
     sentNotifications: new Set(),
+    // Detecta tema salvo ou preferência do sistema
     darkMode: localStorage.getItem('theme') === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)
 };
 
-// Elementos DOM
+// ==========================================
+// ELEMENTOS DO DOM
+// ==========================================
+
 const elements = {
+    // Header
     headerDate: document.getElementById('header-date'),
     headerTime: document.getElementById('header-time'),
     btnOpenManual: document.getElementById('btn-open-manual'),
     btnThemeToggle: document.getElementById('btn-theme-toggle'),
     iconTheme: document.getElementById('icon-theme'),
     
+    // Actions Bar
     inputSearch: document.getElementById('input-search'),
     btnOpenRegister: document.getElementById('btn-open-register'),
     btnOpenCollaborators: document.getElementById('btn-open-collaborators'),
     
+    // Tabela
     tableBody: document.getElementById('table-body'),
     emptyState: document.getElementById('empty-state'),
+    
+    // Notificações
     notificationContainer: document.getElementById('notification-container'),
     
-    // Modais
+    // Modal Register
     modalRegister: document.getElementById('modal-register'),
     modalBackdrop: document.getElementById('modal-backdrop'),
     inputRegName: document.getElementById('reg-name'),
@@ -57,20 +67,24 @@ const elements = {
     btnSaveRegister: document.getElementById('btn-save-register'),
     btnCancelRegister: document.getElementById('btn-cancel-register'),
     
+    // Modal Collaborators
     modalCollaborators: document.getElementById('modal-collaborators'),
     btnCloseCollab: document.getElementById('btn-close-collab'),
     inputSearchCollabModal: document.getElementById('input-search-collab-modal'),
     collaboratorsList: document.getElementById('collaborators-list'),
 
+    // Modal Manual
     modalManual: document.getElementById('modal-manual'),
     btnCloseManual: document.getElementById('btn-close-manual'),
     
+    // Modal Info
     modalInfo: document.getElementById('modal-info'),
     infoName: document.getElementById('info-name'),
     infoContent: document.getElementById('info-content'),
     btnCloseInfo: document.getElementById('btn-close-info'),
     btnCloseInfoX: document.getElementById('btn-close-info-x'),
 
+    // Modal Confirm
     modalConfirm: document.getElementById('modal-confirm'),
     confirmMessage: document.getElementById('confirm-message'),
     btnConfirmYes: document.getElementById('btn-confirm-yes'),
@@ -84,27 +98,41 @@ const elements = {
 export async function init() {
     console.log("Inicializando UI SHIFT...");
     
+    // 1. Aplicar Tema Visual
     applyTheme(state.darkMode);
+    
+    // 2. Iniciar Relógio
     startClock();
 
+    // 3. Solicitar Permissão de Notificação
     if ('Notification' in window && Notification.permission !== 'granted') {
         Notification.requestPermission();
     }
 
     try {
+        // 4. Inicializar Banco de Dados
         await db.init();
+        
+        // 5. Verificar mudança de dia
         checkDayChangeLoop();
+        
+        // 6. Carregar Dados
         await loadDailyRecords();
+        
+        // 7. Configurar Eventos
         setupEventListeners();
+        
+        // 8. Iniciar Loop de Atualização de Tempo (Tabela)
         startTimeLoop();
 
     } catch (error) {
-        console.error("Falha fatal:", error);
+        console.error("Falha fatal na inicialização:", error);
+        alert("Erro crítico ao carregar a aplicação. Tente recarregar a página.");
     }
 }
 
 // ==========================================
-// DARK MODE
+// TEMA (DARK MODE)
 // ==========================================
 
 function toggleDarkMode() {
@@ -124,7 +152,7 @@ function applyTheme(isDark) {
 }
 
 // ==========================================
-// RELÓGIO
+// RELÓGIO E DATA
 // ==========================================
 
 function startClock() {
@@ -141,18 +169,20 @@ function startClock() {
 }
 
 function checkDayChangeLoop() {
+    // Verifica a cada 60s se o dia virou
     setInterval(() => {
         const realToday = getLocalISODate();
         if (realToday !== state.currentDate) {
+            console.log("Detectada virada de dia. Atualizando...");
             state.currentDate = realToday;
-            state.records = [];
-            loadDailyRecords();
+            state.records = []; // Limpa memória
+            loadDailyRecords(); // Recarrega
         }
     }, 60000);
 }
 
 // ==========================================
-// TABELA
+// TABELA (RENDERIZAÇÃO)
 // ==========================================
 
 async function loadDailyRecords() {
@@ -162,6 +192,7 @@ async function loadDailyRecords() {
 
 function renderTable() {
     elements.tableBody.innerHTML = '';
+
     if (state.records.length === 0) {
         elements.emptyState.classList.remove('hidden');
         return;
@@ -171,6 +202,8 @@ function renderTable() {
     state.records.forEach(record => {
         const row = createRow(record);
         elements.tableBody.appendChild(row);
+        
+        // Calcula lógica inicial
         const schedule = Logic.calculateSchedule(record, record.profile_data);
         updateRowVisuals(row, schedule);
         checkNotifications(record, schedule);
@@ -179,54 +212,63 @@ function renderTable() {
 
 function createRow(record) {
     const tr = document.createElement('tr');
-    tr.className = 'hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors group';
+    tr.className = 'hover:bg-brand-50 dark:hover:bg-gray-700 transition-colors group';
     tr.dataset.id = record.id;
     tr.recordData = record;
 
     const times = record.times || {};
+    
+    // Classes auxiliares para alinhamento vertical perfeito
     const cellWrapperClass = "flex flex-col items-center justify-center py-1";
     const spacerClass = "text-[10px] mt-0.5 min-h-[14px] leading-tight";
 
     tr.innerHTML = `
-        <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
-            <button class="btn-info text-brand-600 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 p-1 rounded hover:bg-brand-50 dark:hover:bg-brand-900 transition flex items-center justify-center mx-auto">
+        <td class="px-2 align-middle border-b border-brand-100 dark:border-gray-700">
+            <button class="btn-info text-brand-600 dark:text-brand-400 hover:text-brand-800 dark:hover:text-brand-300 p-1 rounded-lg hover:bg-brand-100 dark:hover:bg-gray-600 transition flex items-center justify-center mx-auto">
                 <i class="ph ph-info text-xl"></i>
             </button>
         </td>
-        <td class="px-3 align-middle text-sm font-medium text-gray-900 dark:text-white truncate max-w-[140px] border-b border-gray-100 dark:border-gray-700" title="${record.collaborator_name}">
+
+        <td class="px-3 align-middle text-sm font-medium text-gray-900 dark:text-white truncate max-w-[140px] border-b border-brand-100 dark:border-gray-700" title="${record.collaborator_name}">
             ${record.collaborator_name}
         </td>
-        <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
+
+        <td class="px-2 align-middle border-b border-brand-100 dark:border-gray-700">
             <div class="${cellWrapperClass}">
-                <span class="inline-block px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-600">${record.profile_name}</span>
+                <span class="inline-block px-2 py-1 bg-brand-100 dark:bg-brand-900/30 rounded text-xs text-brand-700 dark:text-brand-300 border border-brand-200 dark:border-brand-700">${record.profile_name}</span>
                 <div class="${spacerClass}"></div> 
             </div>
         </td>
-        <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
+
+        <td class="px-2 align-middle border-b border-brand-100 dark:border-gray-700">
             <div class="${cellWrapperClass}">
                 <input type="time" class="table-input inp-entry dark:text-white" value="${times.entry || ''}">
                 <div class="${spacerClass}"></div>
             </div>
         </td>
-        <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
+
+        <td class="px-2 align-middle border-b border-brand-100 dark:border-gray-700">
             <div class="${cellWrapperClass}">
                 <input type="time" class="table-input inp-lunch-out dark:text-white" value="${times.lunch_out || ''}">
                 <div class="cell-lunch-status ${spacerClass}"></div>
             </div>
         </td>
-        <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
+
+        <td class="px-2 align-middle border-b border-brand-100 dark:border-gray-700">
             <div class="${cellWrapperClass}">
                 <input type="time" class="table-input inp-lunch-in dark:text-white" value="${times.lunch_in || ''}">
                 <div class="cell-lunch-duration ${spacerClass} text-gray-400 dark:text-gray-500"></div>
             </div>
         </td>
-        <td class="px-2 align-middle border-b border-gray-100 dark:border-gray-700">
+
+        <td class="px-2 align-middle border-b border-brand-100 dark:border-gray-700">
              <div class="${cellWrapperClass}">
                  <div class="cell-exit-range text-xs font-medium text-gray-700 dark:text-gray-300 h-[29px] flex items-center">--:--</div>
                  <div class="cell-exit-limit ${spacerClass} text-gray-400 dark:text-gray-500"></div>
              </div>
         </td>
-        <td class="px-3 align-middle border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50">
+
+        <td class="px-3 align-middle border-b border-brand-100 dark:border-gray-700 bg-brand-50/50 dark:bg-gray-800/50">
             <div class="${cellWrapperClass}">
                 <div class="flex items-center h-[29px]">
                     <span class="cell-worked font-medium text-gray-600 dark:text-gray-400">--:--</span>
@@ -236,6 +278,7 @@ function createRow(record) {
             </div>
         </td>
     `;
+
     attachRowEvents(tr);
     return tr;
 }
@@ -243,17 +286,22 @@ function createRow(record) {
 function updateRowVisuals(tr, schedule) {
     if (!schedule) return;
 
+    // Status Almoço
     const elLunchStatus = tr.querySelector('.cell-lunch-status');
     if (schedule.lunchStatusText) {
         elLunchStatus.textContent = schedule.lunchStatusText;
         elLunchStatus.className = schedule.isLunchViolation 
             ? 'cell-lunch-status text-[10px] mt-0.5 min-h-[14px] leading-tight text-red-600 dark:text-red-400 font-bold' 
             : 'cell-lunch-status text-[10px] mt-0.5 min-h-[14px] leading-tight text-brand-600 dark:text-brand-400';
-    } else { elLunchStatus.textContent = ''; }
+    } else {
+        elLunchStatus.textContent = '';
+    }
 
+    // Duração Almoço
     const elLunchDur = tr.querySelector('.cell-lunch-duration');
     elLunchDur.textContent = schedule.lunchDuration ? `(${schedule.lunchDuration})` : '';
 
+    // Faixa de Saída
     const elExitRange = tr.querySelector('.cell-exit-range');
     const elExitLimit = tr.querySelector('.cell-exit-limit');
     if (schedule.exitRangeText) {
@@ -264,33 +312,68 @@ function updateRowVisuals(tr, schedule) {
         elExitLimit.textContent = "";
     }
 
+    // Trabalhado (E Lógica de 6h sem Almoço)
     const elWorked = tr.querySelector('.cell-worked');
-    elWorked.textContent = schedule.workedCurrent;
-    
-    if (schedule.workStatusType === 'exceeded') elWorked.className = 'cell-worked font-bold text-red-600 dark:text-red-400';
-    else if (schedule.workStatusType === 'extra') elWorked.className = 'cell-worked font-bold text-orange-500 dark:text-orange-400';
-    else if (schedule.isSimulated) elWorked.className = 'cell-worked font-bold text-brand-600 dark:text-brand-400';
-    else elWorked.className = 'cell-worked font-medium text-gray-600 dark:text-gray-400';
-
     const elRemaining = tr.querySelector('.cell-worked-remaining');
-    if (schedule.workRemainingText) {
-        elRemaining.textContent = schedule.workRemainingText;
-        if (schedule.workStatusType === 'exceeded') elRemaining.className = 'cell-worked-remaining text-[10px] mt-0.5 min-h-[14px] leading-tight text-red-600 dark:text-red-400 font-bold';
-        else if (schedule.workStatusType === 'extra') elRemaining.className = 'cell-worked-remaining text-[10px] mt-0.5 min-h-[14px] leading-tight text-orange-500 dark:text-orange-400 font-bold';
-        else elRemaining.className = 'cell-worked-remaining text-[10px] mt-0.5 min-h-[14px] leading-tight text-gray-400 dark:text-gray-500';
-    } else { elRemaining.textContent = ''; }
 
+    if (schedule.timeToLunchLimit) {
+        // MODO ALERTA: Ainda não saiu para almoço e está contando tempo
+        elWorked.textContent = schedule.timeToLunchLimit;
+        
+        // Verifica se estourou (contém a string "Estourou") ou se é apenas aviso
+        if (schedule.timeToLunchLimit.includes("Estourou")) {
+            elWorked.className = 'cell-worked font-bold text-red-600 dark:text-red-400 text-xs';
+        } else {
+            // Contagem regressiva normal
+            elWorked.className = 'cell-worked font-bold text-brand-600 dark:text-brand-400 text-xs';
+        }
+        
+        elRemaining.textContent = "Limite de 6h sem pausa";
+        elRemaining.className = 'cell-worked-remaining text-[9px] mt-0.5 min-h-[14px] leading-tight text-gray-400 dark:text-gray-500 uppercase tracking-tight';
+
+    } else {
+        // MODO PADRÃO: Mostra horas trabalhadas normais
+        elWorked.textContent = schedule.workedCurrent;
+        
+        if (schedule.workStatusType === 'exceeded') {
+            elWorked.className = 'cell-worked font-bold text-red-600 dark:text-red-400';
+        } else if (schedule.workStatusType === 'extra') {
+            elWorked.className = 'cell-worked font-bold text-orange-500 dark:text-orange-400';
+        } else if (schedule.isSimulated) {
+            elWorked.className = 'cell-worked font-bold text-brand-600 dark:text-brand-400';
+        } else {
+            elWorked.className = 'cell-worked font-medium text-gray-600 dark:text-gray-400';
+        }
+
+        // Texto abaixo (Restante/Extra)
+        if (schedule.workRemainingText) {
+            elRemaining.textContent = schedule.workRemainingText;
+            if (schedule.workStatusType === 'exceeded') {
+                elRemaining.className = 'cell-worked-remaining text-[10px] mt-0.5 min-h-[14px] leading-tight text-red-600 dark:text-red-400 font-bold';
+            } else if (schedule.workStatusType === 'extra') {
+                elRemaining.className = 'cell-worked-remaining text-[10px] mt-0.5 min-h-[14px] leading-tight text-orange-500 dark:text-orange-400 font-bold';
+            } else {
+                elRemaining.className = 'cell-worked-remaining text-[10px] mt-0.5 min-h-[14px] leading-tight text-gray-400 dark:text-gray-500';
+            }
+        } else {
+            elRemaining.textContent = '';
+        }
+    }
+
+    // Alertas (Ícone de Atenção)
     const elAlerts = tr.querySelector('.cell-alerts');
     if (schedule.alerts && schedule.alerts.length > 0) {
         const hasDanger = schedule.alerts.some(a => a.type === 'danger');
         const color = hasDanger ? 'text-red-500' : 'text-yellow-500';
         const titles = schedule.alerts.map(a => a.message).join('\n');
         elAlerts.innerHTML = `<i class="ph ph-warning ${color} text-lg cursor-help" title="${titles}"></i>`;
-    } else { elAlerts.innerHTML = ''; }
+    } else {
+        elAlerts.innerHTML = '';
+    }
 }
 
 // ==========================================
-// NOTIFICATIONS
+// NOTIFICAÇÕES (TOASTS)
 // ==========================================
 
 function checkNotifications(record, schedule) {
@@ -301,16 +384,28 @@ function checkNotifications(record, schedule) {
     if (state.sentNotifications.has(key)) return;
 
     if (trigger === 'warning_10min') {
-        sendNotification(`⚠️ Atenção: ${record.collaborator_name}`, `Faltam 10 minutos para o limite máximo de horas extras.`, 'warning');
+        sendNotification(
+            `⚠️ Atenção: ${record.collaborator_name}`, 
+            `Faltam 10 minutos para o limite máximo de horas extras.`,
+            'warning'
+        );
     } else if (trigger === 'warning_critical') {
-        sendNotification(`🚨 CRÍTICO: ${record.collaborator_name}`, `Limite de horas extras atingido ou prestes a estourar!`, 'danger');
+        sendNotification(
+            `🚨 CRÍTICO: ${record.collaborator_name}`, 
+            `Limite de horas extras atingido ou prestes a estourar!`,
+            'danger'
+        );
     }
     state.sentNotifications.add(key);
 }
 
 function sendNotification(title, body, type = 'info') {
     if ('Notification' in window && Notification.permission === 'granted' && document.hidden) {
-        new Notification(title, { body: body, icon: 'assets/icons/icon-192.png', tag: 'shift-alert' });
+        new Notification(title, {
+            body: body,
+            icon: 'assets/icons/icon-192.png',
+            tag: 'shift-alert'
+        });
     }
     createToast(title, body, type);
 }
@@ -337,7 +432,9 @@ function createToast(title, body, type) {
 
     toast.className = `transform transition-all duration-300 translate-x-full opacity-0 flex items-start p-4 mb-2 rounded-lg shadow-lg border ${bgClass} w-full pointer-events-auto`;
     toast.innerHTML = `
-        <div class="flex-shrink-0"><i class="ph ph-${iconName} text-xl ${iconClass}"></i></div>
+        <div class="flex-shrink-0">
+            <i class="ph ph-${iconName} text-xl ${iconClass}"></i>
+        </div>
         <div class="ml-3 w-0 flex-1 pt-0.5">
             <p class="text-sm font-bold text-gray-900 dark:text-gray-100">${title}</p>
             <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">${body}</p>
@@ -351,7 +448,9 @@ function createToast(title, body, type) {
 
     toast.querySelector('button').onclick = () => toast.remove();
     container.appendChild(toast);
+    
     requestAnimationFrame(() => toast.classList.remove('translate-x-full', 'opacity-0'));
+    
     setTimeout(() => {
         if (toast.parentNode) {
             toast.classList.add('opacity-0', 'translate-y-2');
@@ -368,24 +467,29 @@ function showSearchResults(results, query) {
     closeSearchResults();
     const container = document.createElement('div');
     container.id = 'search-results';
-    container.className = 'absolute top-full left-0 w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 shadow-lg rounded-lg mt-1 z-50 max-h-60 overflow-y-auto';
+    container.className = 'absolute top-full left-0 w-full bg-white dark:bg-gray-800 border border-brand-200 dark:border-gray-600 shadow-lg rounded-lg mt-1 z-50 max-h-60 overflow-y-auto';
 
     if (results.length === 0) {
         const item = document.createElement('div');
-        item.className = 'px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-brand-600 dark:text-brand-400 font-medium flex items-center gap-2';
+        item.className = 'px-4 py-3 hover:bg-brand-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-brand-600 dark:text-brand-400 font-medium flex items-center gap-2';
         item.innerHTML = `<i class="ph ph-plus"></i> Registrar "${query}"`;
-        item.onclick = () => { closeSearchResults(); openRegisterModal(query); };
+        item.onclick = () => {
+            closeSearchResults();
+            openRegisterModal(query);
+        };
         container.appendChild(item);
     } else {
         results.forEach(collab => {
             const item = document.createElement('div');
-            item.className = 'px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-800 dark:text-gray-200 border-b border-gray-100 dark:border-gray-700 last:border-0 hover:text-brand-600 dark:hover:text-brand-400';
+            item.className = 'px-4 py-3 hover:bg-brand-50 dark:hover:bg-gray-700 cursor-pointer text-sm text-gray-800 dark:text-gray-200 border-b border-brand-100 dark:border-gray-700 last:border-0 hover:text-brand-600 dark:hover:text-brand-400';
             item.textContent = collab.name;
             item.onclick = () => addToDaily(collab);
             container.appendChild(item);
         });
     }
+
     elements.inputSearch.parentElement.appendChild(container);
+    
     document.addEventListener('click', function close(e) {
         if (!elements.inputSearch.contains(e.target) && !container.contains(e.target)) {
             closeSearchResults();
@@ -398,13 +502,16 @@ async function loadCollaboratorsList(query) {
     let results = query ? await db.searchCollaborators(query) : await db.searchCollaborators('');
     const list = elements.collaboratorsList;
     list.innerHTML = '';
+
     if (results.length === 0) {
         list.innerHTML = '<div class="p-4 text-center text-gray-400 text-sm">Nenhum colaborador encontrado.</div>';
         return;
     }
+
     results.forEach(collab => {
         const div = document.createElement('div');
-        div.className = 'px-4 py-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-gray-700 border-b border-gray-100 dark:border-gray-700 last:border-0';
+        div.className = 'px-4 py-3 flex items-center justify-between hover:bg-brand-50 dark:hover:bg-gray-700 border-b border-brand-100 dark:border-gray-700 last:border-0';
+        
         div.innerHTML = `
             <div>
                 <div class="text-sm font-medium text-gray-900 dark:text-gray-100">${collab.name}</div>
@@ -414,6 +521,7 @@ async function loadCollaboratorsList(query) {
                 <i class="ph ph-info text-xl"></i>
             </button>
         `;
+        
         const btn = div.querySelector('button');
         btn.onclick = async () => {
             let record = state.records.find(r => r.collaborator_id === collab.id);
@@ -428,11 +536,12 @@ async function loadCollaboratorsList(query) {
             }
             openInfoModal(record);
         };
+
         list.appendChild(div);
     });
 }
 
-// *** ESTA É A FUNÇÃO QUE FALTAVA NA VERSÃO ANTERIOR ***
+// *** FUNÇÃO VITAL ***
 async function openCollaboratorsModal() {
     elements.inputSearchCollabModal.value = '';
     elements.modalCollaborators.classList.remove('hidden');
@@ -446,8 +555,8 @@ async function openInfoModal(record) {
     const schedule = Logic.calculateSchedule(record, record.profile_data);
 
     let html = `
-        <div class="bg-gray-50 dark:bg-gray-700 p-4 rounded-lg mb-4 text-left border border-gray-100 dark:border-gray-600">
-            <h4 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 flex items-center gap-2">
+        <div class="bg-brand-50 dark:bg-gray-700 p-4 rounded-lg mb-4 text-left border border-brand-100 dark:border-gray-600">
+            <h4 class="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase mb-3 flex items-center gap-2">
                 <i class="ph ph-calendar-today"></i> Resumo de Hoje
             </h4>
             <div class="grid grid-cols-2 gap-y-3 gap-x-4 text-sm">
@@ -458,35 +567,56 @@ async function openInfoModal(record) {
             </div>
             ${renderAlertsList(schedule.alerts)}
         </div>
-        <h4 class="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase mb-3 text-left flex items-center gap-2 mt-6">
+
+        <h4 class="text-xs font-bold text-brand-600 dark:text-brand-400 uppercase mb-3 text-left flex items-center gap-2 mt-6">
             <i class="ph ph-clock-counter-clockwise"></i> Histórico Recente
         </h4>
-        <div class="overflow-hidden border border-gray-200 dark:border-gray-600 rounded-lg">
-            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-600 text-xs">
-                <thead class="bg-gray-50 dark:bg-gray-700">
+        <div class="overflow-hidden border border-brand-200 dark:border-gray-600 rounded-lg">
+            <table class="min-w-full divide-y divide-brand-200 dark:divide-gray-600 text-xs">
+                <thead class="bg-brand-50 dark:bg-gray-700">
                     <tr>
-                        <th class="px-3 py-2 text-left text-gray-500 dark:text-gray-400 font-medium">Data</th>
-                        <th class="px-3 py-2 text-center text-gray-500 dark:text-gray-400 font-medium">Entrada</th>
-                        <th class="px-3 py-2 text-center text-gray-500 dark:text-gray-400 font-medium">Saída</th>
+                        <th class="px-3 py-2 text-left text-brand-600 dark:text-brand-400 font-medium">Data</th>
+                        <th class="px-3 py-2 text-center text-brand-600 dark:text-brand-400 font-medium">Entrada</th>
+                        <th class="px-3 py-2 text-center text-brand-600 dark:text-brand-400 font-medium">Saída</th>
                     </tr>
                 </thead>
-                <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-600">
+                <tbody class="bg-white dark:bg-gray-800 divide-y divide-brand-200 dark:divide-gray-600">
     `;
+
     const validHistory = history.filter(h => h.date !== state.currentDate);
+
     if (validHistory.length === 0) {
         html += `<tr><td colspan="3" class="px-3 py-4 text-center text-gray-400">Nenhum histórico anterior disponível.</td></tr>`;
     } else {
         validHistory.forEach(h => {
             const exitTime = h.times.exit_time_real || h.times.exit_estimated || '--:--';
             const dateStr = h.date.split('-').reverse().join('/');
-            html += `<tr><td class="px-3 py-2 text-gray-900 dark:text-gray-200 font-medium">${dateStr}</td><td class="px-3 py-2 text-center text-gray-600 dark:text-gray-400">${h.times.entry || '--'}</td><td class="px-3 py-2 text-center text-gray-600 dark:text-gray-400">${exitTime}</td></tr>`;
+            html += `
+                <tr>
+                    <td class="px-3 py-2 text-gray-900 dark:text-gray-200 font-medium">${dateStr}</td>
+                    <td class="px-3 py-2 text-center text-gray-600 dark:text-gray-400">${h.times.entry || '--'}</td>
+                    <td class="px-3 py-2 text-center text-gray-600 dark:text-gray-400">${exitTime}</td>
+                </tr>
+            `;
         });
     }
+
     html += `</tbody></table></div>`;
     elements.infoContent.innerHTML = html;
     elements.modalInfo.classList.remove('hidden');
     elements.modalBackdrop.classList.remove('hidden');
 }
+
+function closeInfoModal() {
+    elements.modalInfo.classList.add('hidden');
+    if (!hasOtherModalsOpen()) {
+        elements.modalBackdrop.classList.add('hidden');
+    }
+}
+
+// ==========================================
+// OUTROS MODAIS (Register, Confirm)
+// ==========================================
 
 function openRegisterModal(nameValue = '') {
     elements.inputRegName.value = nameValue;
@@ -536,97 +666,6 @@ async function handleSaveRegister() {
     }
 }
 
-// ==========================================
-// HELPERS
-// ==========================================
-
-function setupEventListeners() {
-    // Theme
-    elements.btnThemeToggle.addEventListener('click', toggleDarkMode);
-
-    // Search
-    elements.inputSearch.addEventListener('input', (e) => {
-        const query = e.target.value;
-        if (state.searchDebounce) clearTimeout(state.searchDebounce);
-        state.searchDebounce = setTimeout(async () => {
-            if (query.length < 2) {
-                closeSearchResults();
-                return;
-            }
-            const results = await db.searchCollaborators(query);
-            showSearchResults(results, query);
-        }, 300);
-    });
-
-    // Buttons
-    elements.btnOpenRegister.addEventListener('click', () => openRegisterModal(elements.inputSearch.value));
-    elements.btnOpenCollaborators.addEventListener('click', openCollaboratorsModal);
-    elements.btnOpenManual.addEventListener('click', () => {
-        elements.modalManual.classList.remove('hidden');
-        elements.modalBackdrop.classList.remove('hidden');
-    });
-
-    // Modal Register Actions
-    elements.btnSaveRegister.addEventListener('click', handleSaveRegister);
-    elements.btnCancelRegister.addEventListener('click', closeRegisterModal);
-    
-    // Modal Info Actions
-    elements.btnCloseInfo.addEventListener('click', closeInfoModal);
-    elements.btnCloseInfoX.addEventListener('click', closeInfoModal);
-    
-    // Modal Collab Actions
-    elements.btnCloseCollab.addEventListener('click', () => {
-        elements.modalCollaborators.classList.add('hidden');
-        if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
-    });
-    
-    elements.inputSearchCollabModal.addEventListener('input', (e) => {
-        const query = e.target.value;
-        if (state.collabSearchDebounce) clearTimeout(state.collabSearchDebounce);
-        state.collabSearchDebounce = setTimeout(() => loadCollaboratorsList(query), 300);
-    });
-
-    // Modal Manual Actions
-    elements.btnCloseManual.addEventListener('click', () => {
-        elements.modalManual.classList.add('hidden');
-        if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
-    });
-}
-
-function hasOtherModalsOpen() {
-    return !elements.modalRegister.classList.contains('hidden') || 
-           !elements.modalInfo.classList.contains('hidden') ||
-           !elements.modalConfirm.classList.contains('hidden');
-}
-
-function closeSearchResults() {
-    const el = document.getElementById('search-results');
-    if (el) el.remove();
-}
-
-async function addToDaily(collab) {
-    closeSearchResults();
-    elements.inputSearch.value = '';
-    const exists = state.records.find(r => r.collaborator_id === collab.id);
-    if (exists) {
-        showConfirmModal("Aviso", "Este colaborador já está na lista de hoje.", null, true);
-        return;
-    }
-    const newRecord = {
-        collaborator_id: collab.id,
-        date: state.currentDate,
-        times: {},
-        status: 'working'
-    };
-    await db.saveDailyRecord(newRecord);
-    loadDailyRecords();
-}
-
-function closeInfoModal() {
-    elements.modalInfo.classList.add('hidden');
-    if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
-}
-
 function renderAlertsList(alerts) {
     if (!alerts || alerts.length === 0) return '';
     let html = '<div class="mt-3 space-y-1">';
@@ -645,7 +684,6 @@ function showConfirmModal(title, message, onConfirm, isAlertOnly = false, onCanc
 
     const btnYes = elements.btnConfirmYes;
     const btnNo = elements.btnConfirmNo;
-    
     const newYes = btnYes.cloneNode(true);
     const newNo = btnNo.cloneNode(true);
     btnYes.parentNode.replaceChild(newYes, btnYes);
@@ -678,6 +716,10 @@ function showConfirmModal(title, message, onConfirm, isAlertOnly = false, onCanc
     }
 }
 
+// ==========================================
+// EVENTOS DE LINHA (Inputs da Tabela)
+// ==========================================
+
 function attachRowEvents(tr) {
     const record = tr.recordData; 
     const inputs = {
@@ -706,19 +748,22 @@ function attachRowEvents(tr) {
         const input = inputs[key];
         if (!input) return;
 
+        // Evento Input: Atualização Visual (sem salvar)
         input.addEventListener('input', (e) => {
             handleInput(key, e.target.value);
         });
 
+        // Evento Change: Persistência e Validação
         input.addEventListener('change', async (e) => {
             const value = e.target.value;
+            
             if (key === 'lunch_in' && value) {
                 const validation = Logic.validateLunchReturn(
                     record.times.lunch_out, 
                     value, 
                     record.profile_data
                 );
-
+                
                 if (!validation.valid) {
                     showConfirmModal("Erro", validation.message, null, true);
                     e.target.value = ''; 
@@ -741,6 +786,80 @@ function attachRowEvents(tr) {
     });
 
     tr.querySelector('.btn-info').addEventListener('click', () => openInfoModal(record));
+}
+
+// ==========================================
+// LOOP PRINCIPAL DE LISTENERS
+// ==========================================
+
+function setupEventListeners() {
+    // 1. Alternar Tema
+    elements.btnThemeToggle.addEventListener('click', toggleDarkMode);
+
+    // 2. Busca Principal
+    elements.inputSearch.addEventListener('input', (e) => {
+        const query = e.target.value;
+        if (state.searchDebounce) clearTimeout(state.searchDebounce);
+        state.searchDebounce = setTimeout(async () => {
+            if (query.length < 2) {
+                closeSearchResults();
+                return;
+            }
+            const results = await db.searchCollaborators(query);
+            showSearchResults(results, query);
+        }, 300);
+    });
+
+    // 3. Botões Principais
+    elements.btnOpenRegister.addEventListener('click', () => {
+        openRegisterModal(elements.inputSearch.value);
+    });
+    
+    elements.btnOpenCollaborators.addEventListener('click', openCollaboratorsModal);
+    
+    elements.btnOpenManual.addEventListener('click', () => {
+        elements.modalManual.classList.remove('hidden');
+        elements.modalBackdrop.classList.remove('hidden');
+    });
+
+    // 4. Modais (Fechar/Salvar)
+    elements.btnSaveRegister.addEventListener('click', handleSaveRegister);
+    elements.btnCancelRegister.addEventListener('click', closeRegisterModal);
+    
+    elements.btnCloseInfo.addEventListener('click', closeInfoModal);
+    elements.btnCloseInfoX.addEventListener('click', closeInfoModal);
+    
+    // Fechar Modal Colaboradores
+    elements.btnCloseCollab.addEventListener('click', () => {
+        elements.modalCollaborators.classList.add('hidden');
+        if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
+    });
+    
+    // Busca dentro do Modal Colaboradores
+    elements.inputSearchCollabModal.addEventListener('input', (e) => {
+        const query = e.target.value;
+        if (state.collabSearchDebounce) clearTimeout(state.collabSearchDebounce);
+        state.collabSearchDebounce = setTimeout(() => {
+            loadCollaboratorsList(query);
+        }, 300);
+    });
+
+    // Fechar Modal Manual
+    elements.btnCloseManual.addEventListener('click', () => {
+        elements.modalManual.classList.add('hidden');
+        if (!hasOtherModalsOpen()) elements.modalBackdrop.classList.add('hidden');
+    });
+}
+
+function hasOtherModalsOpen() {
+    return !elements.modalRegister.classList.contains('hidden') || 
+           !elements.modalInfo.classList.contains('hidden') ||
+           !elements.modalConfirm.classList.contains('hidden');
+}
+
+function closeSearchResults() {
+    const el = document.getElementById('search-results');
+    if (el) el.remove();
 }
 
 function startTimeLoop() {
